@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="fresh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>待辦事項</title>
+<style>
+  /* ================= 卡片版面（配色由各主題覆寫變數） ================= */
+  :root {
+    --bg: #eef0f6; --bg-image: none; --bg-size: auto;
+    --card: #fff; --text: #1f2328; --muted: #8a919a; --border: #e3e5e8;
+    --accent: #5b5bd6; --on-accent: #fff; --danger: #e5484d; --warn: #e08a00; --info: var(--accent);
+    --radius: 14px; --radius-sm: 10px;
+    --shadow: 0 2px 8px rgba(30,35,60,.07); --line: 1px solid var(--border);
+    --font-body: system-ui, -apple-system, "Segoe UI", "Microsoft JhengHei", sans-serif;
+    --font-head: var(--font-body); --font-meta: var(--font-body);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--text); font-size: 16px; font-family: var(--font-body);
+    background-color: var(--bg); background-image: var(--bg-image); background-size: var(--bg-size);
+    display: flex; justify-content: center; align-items: flex-start; padding: 48px 16px;
+  }
+  .app { width: 100%; max-width: 580px; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  h1 { margin: 0; font-size: 28px; font-weight: 700; font-family: var(--font-head); }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+  .seg { display: flex; background: var(--card); border: var(--line); border-radius: var(--radius-sm); padding: 2px; }
+  .seg button { background: transparent; color: var(--muted); padding: 4px 10px; border-radius: calc(var(--radius-sm) - 3px); font-size: 13px; }
+  .seg button.active { background: var(--accent); color: var(--on-accent); }
+  form { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  input[type=text] {
+    flex: 1; min-width: 160px; padding: 12px 14px; font-size: 16px; border: var(--line);
+    border-radius: var(--radius); background: var(--card); color: var(--text); outline: none; font-family: inherit;
+  }
+  input:focus { border-color: var(--accent); }
+  button { cursor: pointer; font: inherit; border: none; border-radius: var(--radius); }
+  .add { background: var(--accent); color: var(--on-accent); padding: 0 22px; font-weight: 600; border-radius: 999px; }
+  .filters { display: flex; gap: 6px; margin-bottom: 12px; }
+  .filters button { background: transparent; color: var(--muted); padding: 6px 14px; border-radius: 999px; }
+  .filters button.active { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+  ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  li { display: flex; align-items: center; gap: 10px; padding: 14px 16px 14px 8px;
+       background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); }
+  li.dragging { opacity: .8; box-shadow: 0 8px 22px rgba(0,0,0,.2); position: relative; z-index: 1; }
+  .handle { cursor: grab; color: var(--muted); padding: 4px 6px; user-select: none; touch-action: none; font-size: 16px; }
+  .handle:active { cursor: grabbing; }
+  li input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+  .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .text { word-break: break-word; cursor: text; }
+  li.done .text { text-decoration: line-through; color: var(--muted); }
+  .edit { padding: 4px 8px !important; font-size: 16px !important; }
+  .meta { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); flex-wrap: wrap; font-family: var(--font-meta); }
+  .badge { font-size: 12px; padding: 1px 7px; border-radius: 6px; font-weight: 600; }
+  .badge:empty { display: none; }
+  .badge.overdue { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); }
+  .badge.today { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+  .badge.ongoing { background: color-mix(in srgb, var(--info) 15%, transparent); color: var(--info); }
+  .badge.upcoming { background: color-mix(in srgb, var(--muted) 15%, transparent); color: var(--muted); }
+  .range { display: flex; align-items: center; gap: 4px; }
+  .sep { color: var(--muted); }
+  /* 日期欄位（自製，才能依語言顯示） */
+  .date { background: var(--card); color: var(--text); border: var(--line); padding: 12px 14px; font-size: 16px; min-width: 120px; text-align: left; }
+  .date.empty { color: var(--muted); }
+  .date.open { border-color: var(--accent); }
+  .meta .date { background: transparent; color: inherit; border: 1px solid transparent; padding: 1px 6px; font-size: 13px; min-width: 0; border-radius: 6px; font-family: inherit; }
+  .meta .date:hover, .meta .date.open { border-color: var(--border); }
+  .meta .date.empty { opacity: .7; }
+  .picker {
+    position: absolute; z-index: 10; width: 260px; padding: 10px; background: var(--card); color: var(--text);
+    border: var(--line); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,.15); user-select: none;
+  }
+  .picker[hidden] { display: none; }
+  .picker .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-weight: 600; font-size: 15px; font-family: var(--font-head); }
+  .picker .head button { background: transparent; color: var(--text); width: 30px; height: 30px; font-size: 18px; border-radius: var(--radius-sm); }
+  .picker .head button:hover { background: var(--bg); }
+  .picker .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+  .picker .wd { font-size: 12px; color: var(--muted); padding: 4px 0; }
+  .picker .day { background: transparent; color: var(--text); height: 32px; border-radius: var(--radius-sm); font-size: 14px; }
+  .picker .day:hover { background: var(--bg); }
+  .picker .day.today { color: var(--accent); font-weight: 700; }
+  .picker .day.sel { background: var(--accent); color: var(--on-accent); }
+  .picker .foot { display: flex; justify-content: space-between; margin-top: 6px; }
+  .picker .foot button { background: transparent; color: var(--accent); padding: 4px 8px; font-size: 14px; border-radius: var(--radius-sm); }
+  .picker .foot button:hover { background: var(--bg); }
+  .del { background: transparent; color: var(--muted); font-size: 18px; padding: 2px 8px; opacity: 0; }
+  li:hover .del { opacity: 1; }
+  .del:hover { color: var(--danger); }
+  @media (hover: none) { .del { opacity: 1; } }
+  .empty-list { padding: 32px; text-align: center; color: var(--muted); background: var(--card); border-radius: var(--radius); }
+  footer { display: flex; justify-content: space-between; margin-top: 14px; color: var(--muted); font-size: 14px; }
+  footer button { background: transparent; color: var(--muted); padding: 0; }
+  footer button:hover { color: var(--danger); }
+
+  /* ================= 配色 1：文藝清新 Fresh ================= */
+  /* 鼠尾草綠 × 米白紙張、襯線標題、大圓角柔光陰影 */
+  [data-theme=fresh] {
+    --bg: #edf1e8; --card: #fffdf7; --text: #3e4a40; --muted: #98a39a; --border: #e2e6da;
+    --accent: #6f957a; --on-accent: #fff; --danger: #c9705f; --warn: #c99a45; --info: #6f957a;
+    --radius: 18px; --radius-sm: 12px; --shadow: 0 4px 14px rgba(90,110,90,.08);
+    --font-head: "Noto Serif TC", "Songti TC", "PMingLiU", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    [data-theme=fresh] {
+      --bg: #1b201c; --card: #242a25; --text: #e3e8df; --muted: #8b968c; --border: #323a33;
+      --accent: #9cc0a3; --on-accent: #1b201c; --info: #9cc0a3; --shadow: 0 4px 14px rgba(0,0,0,.25);
+    }
+  }
+  [data-theme=fresh] h1 { font-weight: 600; letter-spacing: .08em; }
+  [data-theme=fresh] .text { letter-spacing: .02em; }
+
+  /* ================= 配色 2：普普 Pop ================= */
+  /* 檸檬黃網點底、粗黑描邊、硬陰影、桃紅 × 青藍撞色 */
+  [data-theme=pop] {
+    --bg: #ffe14a; --bg-image: radial-gradient(rgba(0,0,0,.14) 1.2px, transparent 1.5px); --bg-size: 14px 14px;
+    --card: #fff; --text: #111; --muted: #555; --border: #111;
+    --accent: #ff2e63; --on-accent: #fff; --danger: #e63946; --warn: #ff9f1c; --info: #00a6d6;
+    --radius: 12px; --radius-sm: 8px; --shadow: 4px 4px 0 var(--border); --line: 2px solid var(--border);
+    --font-head: "Arial Black", "Segoe UI Black", "Microsoft JhengHei", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    [data-theme=pop] {
+      --bg: #221a3a; --bg-image: radial-gradient(rgba(255,255,255,.09) 1.2px, transparent 1.5px);
+      --card: #2e2450; --text: #fff; --muted: #c9c2e0; --border: #f5f0ff; --shadow: 4px 4px 0 var(--accent);
+    }
+  }
+  /* 標題做成傾斜貼紙：硬陰影放在外框而非文字上，維持普普感也保持字清楚 */
+  [data-theme=pop] h1 { font-weight: 900; letter-spacing: .04em; }
+  [data-theme=pop] h1 span {
+    display: inline-block; padding: 2px 14px 4px; background: var(--card); color: var(--text);
+    border: var(--line); border-radius: var(--radius-sm); box-shadow: 4px 4px 0 var(--accent); transform: rotate(-2deg);
+  }
+  [data-theme=pop] li, [data-theme=pop] .empty-list, [data-theme=pop] .add,
+  [data-theme=pop] .filters button.active, [data-theme=pop] .seg, [data-theme=pop] .picker,
+  [data-theme=pop] input[type=text], [data-theme=pop] form .date { border: var(--line); box-shadow: var(--shadow); }
+  [data-theme=pop] .add { font-weight: 800; transition: transform .08s, box-shadow .08s; }
+  [data-theme=pop] .add:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--border); }
+  [data-theme=pop] .filters button.active { font-weight: 700; }
+  [data-theme=pop] li input[type=checkbox] { width: 20px; height: 20px; }
+  [data-theme=pop] .badge { border: 1.5px solid var(--border); color: #111; }
+  [data-theme=pop] .badge.overdue { background: var(--danger); color: #fff; }
+  [data-theme=pop] .badge.today { background: var(--warn); }
+  [data-theme=pop] .badge.ongoing { background: var(--info); color: #fff; }
+  [data-theme=pop] .badge.upcoming { background: #fff; }
+  [data-theme=pop] footer { color: var(--text); font-weight: 600; }
+  [data-theme=pop] footer button { color: var(--text); }
+
+  /* ================= 配色 3：工業風 Industrial ================= */
+  /* 水泥灰格線底、鐵鏽橘重點色、等寬字日期、左側色條 */
+  [data-theme=industrial] {
+    --bg: #d4d1ca;
+    --bg-image: linear-gradient(rgba(255,255,255,.28) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.28) 1px, transparent 1px);
+    --bg-size: 24px 24px;
+    --card: #eeece7; --text: #262626; --muted: #77736b; --border: #b5b1a8;
+    --accent: #b8532a; --on-accent: #fff; --danger: #a8281f; --warn: #b07d00; --info: #476a82;
+    --radius: 6px; --radius-sm: 4px; --shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 2px 4px rgba(0,0,0,.14);
+    --font-meta: "Cascadia Mono", Consolas, "JetBrains Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    [data-theme=industrial] {
+      --bg: #1c1c1c;
+      --bg-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+      --card: #2a2927; --text: #e7e4dd; --muted: #8f8a80; --border: #3d3b37;
+      --accent: #e0743c; --on-accent: #1c1c1c; --danger: #e5594f; --warn: #e0a82e; --info: #7fa6c2;
+      --shadow: 0 2px 6px rgba(0,0,0,.4);
+    }
+  }
+  [data-theme=industrial] h1 { text-transform: uppercase; letter-spacing: .12em; font-weight: 800; }
+  [data-theme=industrial] li { border-left: 4px solid var(--accent); padding-left: 6px; }
+  [data-theme=industrial] li.done { border-left-color: var(--muted); }
+  [data-theme=industrial] .add, [data-theme=industrial] .filters button { border-radius: var(--radius-sm); }
+  [data-theme=industrial] .add { text-transform: uppercase; letter-spacing: .08em; }
+  [data-theme=industrial] .badge { border-radius: 2px; text-transform: uppercase; letter-spacing: .04em; font-size: 11px; font-family: var(--font-meta); }
+  [data-theme=industrial] footer, [data-theme=industrial] form .date { font-family: var(--font-meta); }
+  [data-theme=industrial] footer { font-size: 13px; letter-spacing: .03em; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>📝 <span data-i18n="title"></span></h1>
+    <div class="controls">
+      <div class="seg" id="themes">
+        <button data-theme-btn="fresh" data-i18n="themeFresh"></button>
+        <button data-theme-btn="pop" data-i18n="themePop"></button>
+        <button data-theme-btn="industrial" data-i18n="themeIndustrial"></button>
+      </div>
+      <div class="seg" id="langs">
+        <button data-lang="zh">中</button>
+        <button data-lang="en">EN</button>
+      </div>
+    </div>
+  </header>
+  <main class="content">
+    <form id="form">
+      <input type="text" id="input" data-i18n-placeholder="placeholder" autocomplete="off" autofocus>
+      <span class="range">
+        <button type="button" class="date" id="start" data-ph="startPh" data-i18n-title="startOpt"></button>
+        <span class="sep">~</span>
+        <button type="button" class="date" id="due" data-ph="duePh" data-i18n-title="dueOpt"></button>
+      </span>
+      <button class="add" type="submit" data-i18n="add"></button>
+    </form>
+    <div class="filters">
+      <button data-filter="all" class="active" data-i18n="all"></button>
+      <button data-filter="active" data-i18n="active"></button>
+      <button data-filter="done" data-i18n="done"></button>
+    </div>
+    <ul id="list"></ul>
+    <footer>
+      <span id="count"></span>
+      <button id="clear" data-i18n="clear"></button>
+    </footer>
+  </main>
+</div>
+<div class="picker" id="picker" hidden></div>
+
+<script>
+  const I18N = {
+    zh: {
+      locale: 'zh-TW',
+      title: '待辦事項', placeholder: '要做什麼？', add: '新增',
+      all: '全部', active: '未完成', done: '已完成', clear: '清除已完成',
+      empty: '沒有項目', drag: '拖曳排序', del: '刪除',
+      start: '開始日期', due: '預定完成日期',
+      startOpt: '開始日期（可不填）', dueOpt: '預定完成日期（可不填）',
+      startPh: '開始日', duePh: '結束日',
+      pickToday: '今天', pickClear: '清除', prevMonth: '上個月', nextMonth: '下個月',
+      overdue: '逾期', today: '今天到期', upcoming: '未開始', ongoing: '進行中',
+      themeFresh: '清新', themePop: '普普', themeIndustrial: '工業',
+      left: n => `剩餘 ${n} 項`,
+    },
+    en: {
+      locale: 'en-US',
+      title: 'To-Do List', placeholder: 'What needs to be done?', add: 'Add',
+      all: 'All', active: 'Active', done: 'Done', clear: 'Clear completed',
+      empty: 'No items', drag: 'Drag to reorder', del: 'Delete',
+      start: 'Start date', due: 'Due date',
+      startOpt: 'Start date (optional)', dueOpt: 'Due date (optional)',
+      startPh: 'Start', duePh: 'Due',
+      pickToday: 'Today', pickClear: 'Clear', prevMonth: 'Previous month', nextMonth: 'Next month',
+      overdue: 'Overdue', today: 'Due today', upcoming: 'Upcoming', ongoing: 'In progress',
+      themeFresh: 'Fresh', themePop: 'Pop', themeIndustrial: 'Industrial',
+      left: n => `${n} item${n === 1 ? '' : 's'} left`,
+    },
+  };
+  const THEMES = ['fresh', 'pop', 'industrial'];
+
+  const KEY = 'todos';
+  let todos = JSON.parse(localStorage.getItem(KEY) || '[]');
+  let filter = 'all';
+  let lang = localStorage.getItem('lang') || (navigator.language.startsWith('zh') ? 'zh' : 'en');
+  let theme = THEMES.includes(localStorage.getItem('theme')) ? localStorage.getItem('theme') : 'fresh';
+
+  const $ = s => document.querySelector(s);
+  const t_ = key => I18N[lang][key];
+  const save = () => localStorage.setItem(KEY, JSON.stringify(todos));
+  const pad = n => String(n).padStart(2, '0');
+  const toISO = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; // 本地時間
+  const fromISO = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const today = () => toISO(new Date());
+
+  function formatDate(iso) {
+    const opts = lang === 'zh'
+      ? { year: 'numeric', month: '2-digit', day: '2-digit' }   // 2026/10/02
+      : { year: 'numeric', month: 'short', day: 'numeric' };    // Oct 2, 2026
+    return new Intl.DateTimeFormat(t_('locale'), opts).format(fromISO(iso));
+  }
+
+  // 設定日期按鈕的值與顯示文字
+  function setDateBtn(btn, iso) {
+    btn.dataset.value = iso || '';
+    btn.textContent = iso ? formatDate(iso) : t_(btn.dataset.ph);
+    btn.classList.toggle('empty', !iso);
+  }
+
+  // ---- 自製日期選擇器 ----
+  const picker = $('#picker');
+  let pk = null; // { anchor, value, year, month, onPick }
+
+  function openPicker(anchor, onPick) {
+    if (pk && pk.anchor === anchor) return closePicker();
+    closePicker();
+    const base = anchor.dataset.value ? fromISO(anchor.dataset.value) : new Date();
+    pk = { anchor, value: anchor.dataset.value, year: base.getFullYear(), month: base.getMonth(), onPick };
+    anchor.classList.add('open');
+    picker.hidden = false;
+    drawPicker();
+    const r = anchor.getBoundingClientRect();
+    const left = Math.min(r.left, document.documentElement.clientWidth - picker.offsetWidth - 8);
+    picker.style.left = Math.max(8, left) + window.scrollX + 'px';
+    picker.style.top = r.bottom + 4 + window.scrollY + 'px';
+  }
+
+  function closePicker() {
+    if (!pk) return;
+    pk.anchor.classList.remove('open');
+    picker.hidden = true;
+    pk = null;
+  }
+
+  function drawPicker() {
+    const { year, month, value } = pk;
+    const loc = t_('locale');
+    const title = new Intl.DateTimeFormat(loc, { year: 'numeric', month: 'long' }).format(new Date(year, month, 1));
+    const wdFmt = new Intl.DateTimeFormat(loc, { weekday: lang === 'zh' ? 'narrow' : 'short' });
+    // 2023-01-01 是星期日，用來產生週日～週六的名稱
+    const weekdays = [...Array(7)].map((_, i) => wdFmt.format(new Date(2023, 0, 1 + i)));
+    const first = new Date(year, month, 1).getDay();
+    const days = new Date(year, month + 1, 0).getDate();
+    const now = today();
+
+    let html = `<div class="head">
+        <button type="button" data-nav="-1" title="${t_('prevMonth')}">‹</button>
+        <span>${title}</span>
+        <button type="button" data-nav="1" title="${t_('nextMonth')}">›</button>
+      </div><div class="grid">`;
+    html += weekdays.map(w => `<div class="wd">${w}</div>`).join('');
+    html += '<div></div>'.repeat(first);
+    for (let d = 1; d <= days; d++) {
+      const iso = `${year}-${pad(month + 1)}-${pad(d)}`;
+      const cls = ['day', iso === now && 'today', iso === value && 'sel'].filter(Boolean).join(' ');
+      html += `<button type="button" class="${cls}" data-date="${iso}">${d}</button>`;
+    }
+    html += `</div><div class="foot">
+        <button type="button" data-pick="${now}">${t_('pickToday')}</button>
+        <button type="button" data-pick="">${t_('pickClear')}</button>
+      </div>`;
+    picker.innerHTML = html;
+  }
+
+  picker.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || !pk) return;
+    if (b.dataset.nav) {
+      const d = new Date(pk.year, pk.month + Number(b.dataset.nav), 1);
+      pk.year = d.getFullYear(); pk.month = d.getMonth();
+      drawPicker();
+      return;
+    }
+    const iso = b.dataset.date ?? b.dataset.pick;
+    if (iso === undefined) return;
+    const { onPick } = pk;
+    closePicker();
+    onPick(iso);
+  });
+
+  document.addEventListener('pointerdown', e => {
+    if (pk && !picker.contains(e.target) && !pk.anchor.contains(e.target)) closePicker();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePicker(); });
+  window.addEventListener('resize', closePicker);
+
+  // ---- 主題 ----
+  function applyTheme() {
+    closePicker();
+    document.documentElement.dataset.theme = theme;
+    document.querySelectorAll('[data-theme-btn]').forEach(b => b.classList.toggle('active', b.dataset.themeBtn === theme));
+  }
+
+  // ---- 語言 ----
+  function applyLang() {
+    closePicker();
+    document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : 'en';
+    document.title = t_('title');
+    document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t_(el.dataset.i18n));
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => el.placeholder = t_(el.dataset.i18nPlaceholder));
+    document.querySelectorAll('[data-i18n-title]').forEach(el => el.title = t_(el.dataset.i18nTitle));
+    document.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+    setDateBtn($('#start'), $('#start').dataset.value);
+    setDateBtn($('#due'), $('#due').dataset.value);
+    render();
+  }
+
+  function render() {
+    const list = $('#list');
+    const shown = todos.filter(t => filter === 'all' || (filter === 'done') === t.done);
+    list.innerHTML = '';
+    if (!shown.length) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-list'; empty.textContent = t_('empty');
+      list.appendChild(empty);
+    }
+    const now = today();
+    for (const t of shown) {
+      const li = document.createElement('li');
+      li.className = t.done ? 'done' : '';
+      li.dataset.id = t.id;
+      li.innerHTML = `<span class="handle" title="${t_('drag')}">⋮⋮</span>
+                      <input type="checkbox" ${t.done ? 'checked' : ''}>
+                      <div class="body">
+                        <span class="text"></span>
+                        <div class="meta">📅
+                          <button type="button" class="date start" data-ph="startPh" title="${t_('start')}"></button><span class="sep">~</span>
+                          <button type="button" class="date end" data-ph="duePh" title="${t_('due')}"></button><span class="badge"></span>
+                        </div>
+                      </div>
+                      <button class="del" title="${t_('del')}">✕</button>`;
+      li.querySelector('.text').textContent = t.text;
+      const startEl = li.querySelector('.meta .start');
+      const endEl = li.querySelector('.meta .end');
+      setDateBtn(startEl, t.start);
+      setDateBtn(endEl, t.due);
+      const badge = li.querySelector('.badge');
+      if (!t.done) {
+        const set = cls => { badge.textContent = t_(cls); badge.className = 'badge ' + cls; };
+        if (t.due && t.due < now) set('overdue');
+        else if (t.due === now) set('today');
+        else if (t.start && t.start > now) set('upcoming');
+        else if (t.start && t.start <= now) set('ongoing');
+      }
+      startEl.onclick = () => openPicker(startEl, v => { t.start = v; fixRange(t); save(); render(); });
+      endEl.onclick = () => openPicker(endEl, v => { t.due = v; fixRange(t, true); save(); render(); });
+      li.querySelector('input[type=checkbox]').onchange = () => { t.done = !t.done; save(); render(); };
+      li.querySelector('.del').onclick = () => { todos = todos.filter(x => x !== t); save(); render(); };
+      li.querySelector('.text').ondblclick = () => startEdit(li, t);
+      li.querySelector('.handle').onpointerdown = e => startDrag(e, li);
+      list.appendChild(li);
+    }
+    const left = todos.filter(t => !t.done).length;
+    $('#count').textContent = t_('left')(left);
+  }
+
+  // 起日晚於訖日時自動校正：改訖日就把起日拉到同一天，否則把訖日推到起日
+  function fixRange(t, endChanged = false) {
+    if (t.start && t.due && t.start > t.due) {
+      if (endChanged) t.start = t.due; else t.due = t.start;
+    }
+  }
+
+  function startEdit(li, t) {
+    const span = li.querySelector('.text');
+    const input = document.createElement('input');
+    input.type = 'text'; input.className = 'edit'; input.value = t.text;
+    span.replaceWith(input); input.focus(); input.select();
+    let finished = false;
+    const finish = commit => {
+      if (finished) return; finished = true;
+      const v = input.value.trim();
+      if (commit) { if (v) t.text = v; else todos = todos.filter(x => x !== t); save(); }
+      render();
+    };
+    input.onblur = () => finish(true);
+    input.onkeydown = e => { if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); };
+  }
+
+  // 拖曳排序（Pointer Events，滑鼠與觸控皆可用）
+  // 事件掛在 window 上：搬動 DOM 會讓 pointer capture 失效，掛在 handle 上會收不到後續事件
+  function startDrag(e, li) {
+    e.preventDefault();
+    closePicker();
+    const list = $('#list');
+    li.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+
+    const move = ev => {
+      ev.preventDefault();
+      const siblings = [...list.children].filter(x => x !== li);
+      const after = siblings.find(s => {
+        const r = s.getBoundingClientRect();
+        return ev.clientY < r.top + r.height / 2;
+      }) || null;
+      if (li.nextElementSibling !== after) list.insertBefore(li, after);
+    };
+    const end = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      document.body.style.userSelect = '';
+      li.classList.remove('dragging');
+      // 依畫面上的新順序，回填到原陣列中這些項目所佔的位置（篩選時不影響隱藏項目）
+      const newOrder = [...list.children].map(x => todos.find(t => String(t.id) === x.dataset.id));
+      const slots = todos.map((t, i) => newOrder.includes(t) ? i : -1).filter(i => i >= 0);
+      slots.forEach((slot, k) => todos[slot] = newOrder[k]);
+      save(); render();
+    };
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  }
+
+  // 表單的起訖日：選了之後也做相同的自動校正
+  $('#start').onclick = () => openPicker($('#start'), v => {
+    setDateBtn($('#start'), v);
+    const due = $('#due').dataset.value;
+    if (v && due && v > due) setDateBtn($('#due'), v);
+  });
+  $('#due').onclick = () => openPicker($('#due'), v => {
+    setDateBtn($('#due'), v);
+    const start = $('#start').dataset.value;
+    if (v && start && start > v) setDateBtn($('#start'), v);
+  });
+
+  $('#form').onsubmit = e => {
+    e.preventDefault();
+    const v = $('#input').value.trim();
+    if (!v) return;
+    const t = { id: Date.now(), text: v, done: false, start: $('#start').dataset.value, due: $('#due').dataset.value };
+    fixRange(t);
+    todos.push(t);
+    $('#input').value = '';
+    setDateBtn($('#start'), '');
+    setDateBtn($('#due'), '');
+    save(); render();
+  };
+
+  document.querySelectorAll('.filters button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.filters button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); filter = b.dataset.filter; render();
+  });
+
+  document.querySelectorAll('[data-theme-btn]').forEach(b => b.onclick = () => {
+    theme = b.dataset.themeBtn;
+    localStorage.setItem('theme', theme);
+    applyTheme();
+  });
+
+  document.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => {
+    lang = b.dataset.lang;
+    localStorage.setItem('lang', lang);
+    applyLang();
+  });
+
+  $('#clear').onclick = () => { todos = todos.filter(t => !t.done); save(); render(); };
+
+  applyTheme();
+  applyLang();
+</script>
+</body>
+</html>
