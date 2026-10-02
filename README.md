@@ -4,6 +4,12 @@
 
 **👉 線上使用：https://ywentsaitw.github.io/todo/**
 
+## 截圖
+
+| 清新 Fresh | 普普 Pop | 工業 Industrial |
+|:---:|:---:|:---:|
+| ![清新主題](docs/screenshots/fresh.png) | ![普普主題](docs/screenshots/pop.png) | ![工業主題](docs/screenshots/industrial.png) |
+
 ## 功能
 
 - **新增、編輯、刪除**：輸入文字按「新增」；雙擊項目文字可直接修改
@@ -27,6 +33,7 @@
 
 ```
 ├── index.html                       # 轉址頁，自動導向 todo-web/
+├── docs/screenshots/                # README 用的截圖
 └── todo-web/
     ├── index.html                   # 主程式（HTML + CSS + JavaScript 全在這一個檔案）
     └── index-layouts-backup.html    # 舊版版面備份
