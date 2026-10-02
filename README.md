@@ -1,0 +1,2 @@
+# DEMO
+Vibe Coding Practice
