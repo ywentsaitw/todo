@@ -12,6 +12,14 @@ Desktop.ini
 node_modules/
 dist/
 
+# Python
+__pycache__/
+*.pyc
+
+# SQLite 資料庫（使用者資料，不進版控）
+*.db
+*.db-journal
+
 # Logs / env
 *.log
 .env
