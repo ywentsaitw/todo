@@ -6,7 +6,9 @@
 
 ## 截圖
 
-![待辦事項畫面](docs/screenshots/fresh.png)
+![三種主題：清新、普普、工業](docs/screenshots/themes.png)
+
+<sub>由左至右：清新 Fresh／普普 Pop／工業 Industrial</sub>
 
 ## 功能
 
