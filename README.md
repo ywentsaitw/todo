@@ -6,9 +6,7 @@
 
 ## 截圖
 
-| 清新 Fresh | 普普 Pop | 工業 Industrial |
-|:---:|:---:|:---:|
-| ![清新主題](docs/screenshots/fresh.png) | ![普普主題](docs/screenshots/pop.png) | ![工業主題](docs/screenshots/industrial.png) |
+![待辦事項畫面](docs/screenshots/fresh.png)
 
 ## 功能
 
